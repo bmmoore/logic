@@ -6,7 +6,7 @@ module Logic.Parse(
   tokenParser
   ) where
 
-import Logic.Types
+import Logic.Formula
 
 import Text.Parsec hiding ((<|>))
 import Text.Parsec.Expr
@@ -36,8 +36,7 @@ formula = buildExpressionParser [[prefix (Not <$ symbol "~")],
                       symbol "."
                       return (\f -> foldr quantifier f vars))
             (return (.)) id
-           <*> (parens formula
-                <|> Atomic <$> atom))
+           <*> (parens formula <|> Lit . Literal True <$> atom))
 
 atom :: Parser Atom
 atom = Atom <$> (Predicate <$> identifier) <*> option [] (parens (commaSep term)) <?> "atomic formula"

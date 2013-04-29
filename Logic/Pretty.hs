@@ -1,6 +1,6 @@
 module Logic.Pretty where
 
-import Logic.Types
+import Logic.Formula
 import Prelude hiding (Left,Right)
 
 import Text.PrettyPrint.Leijen
@@ -18,6 +18,9 @@ instance Pretty Predicate where
 instance Pretty Atom where
   pretty (Atom p []) = pretty p
   pretty (Atom p ts) = pretty p <> tupled (map pretty ts)
+instance Pretty Literal where
+  pretty (Literal True a) = pretty a
+  pretty (Literal False a) = char '~' <> pretty a
 instance Pretty Formula where
   pretty f = snd (prettyFormula f)
 
@@ -41,22 +44,27 @@ noparens inner@(pi,fi) outer@(po,fo) side =
 bracket :: (OpInfo,Doc) -> Side -> OpInfo -> Doc
 bracket (inner,image) side outer
   | noparens inner outer side = image
-  | otherwise = parens image
+  | otherwise = parens (align image)
 
 prettyFormula :: Formula -> (OpInfo, Doc)
 prettyFormula f = case f of
-  Atomic a -> (maxrator, pretty a)
+  Lit a -> (maxrator, pretty a)
   Not f -> unary (text"~"<>) notOp f
   And l r -> binary "/\\" andOp l r
   Or l r -> binary "\\/" orOp l r
-  Forall v f -> unary ((text"forall"<+>pretty v<+>text".")<+>) quantOp f
-  Exists v f -> unary ((text"exists"<+>pretty v<+>text".")<+>) quantOp f
+  Forall v f -> unary (align.((text"forall"<+>pretty v<+>text".")<+>)) quantOp f
+  Exists v f -> unary (align.((text"exists"<+>pretty v<+>text".")<+>)) quantOp f
  where binary sym o l r =  
          let l' = bracket (prettyFormula l) Left o
              r' = bracket (prettyFormula r) Right o
-         in (o, l'<+>text sym<+>r')
+         in (o, l'</>text sym<+>r')
        unary wrap o f =
          let f' = bracket (prettyFormula f) Nonassoc o
          in (o, wrap f')
        [quantOp,orOp,andOp,notOp,maxrator] =
          zip [0..] [Prefix,Infix Right,Infix Right,Prefix,Infix Nonassoc]
+
+{-
+--A CNF-derived example
+example = pretty (And (Or (Atomic (Atom (Predicate "A") [])) (Or (Atomic (Atom (Predicate "B") [])) (Not (Atomic (Atom (Predicate "C") []))))) (And (Or (Atomic (Atom (Predicate "C") [])) (Not (Atomic (Atom (Predicate "D") [])))) (And (Or (Atomic (Atom (Predicate "D") [])) (Not (Atomic (Atom (Predicate "A") [])))) (Atomic (Atom (Predicate "false") [])))))
+-}

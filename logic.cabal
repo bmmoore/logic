@@ -10,6 +10,6 @@ category:            Math
 build-type:          Simple
 cabal-version:       >=1.8
 library
-  exposed-modules:     Logic, Logic.Types, Logic.Parse, Logic.Pretty
-  build-depends:       base ==4.6.*, parsec >=3.0, wl-pprint >=1.0
-  
+  exposed-modules:     Logic, Logic.Formula, Logic.Parse, Logic.Pretty,
+                       Logic.CNF, Logic.Skolem
+  build-depends:       base ==4.*, parsec >=3.0, wl-pprint >=1.0, mtl >= 2.0, containers
