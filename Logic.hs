@@ -4,6 +4,7 @@ import Logic.Parse
 import Logic.Formula
 import Logic.CNF
 import Logic.Skolem
+import Logic.Resolution
 
 import Control.Monad.State
 import Text.PrettyPrint.Leijen(pretty)

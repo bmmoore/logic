@@ -7,13 +7,22 @@ import qualified Data.Set as Set
 
 import Logic.Formula
 import Logic.Pretty
-import Text.PrettyPrint.Leijen(Doc,Pretty,pretty,(<>),(<+>),text,vcat)
+import Text.PrettyPrint.Leijen
+  hiding ((<$>))
 
-newtype CNF = CNF [[Literal]] -- conjuction of disjunctions
+newtype Clause = Clause [Literal]
   deriving Show
+clauseLiterals (Clause ls) = ls
+newtype CNF = CNF [Clause] -- conjuction of disjunctions
+  deriving Show
+cnfClauses (CNF cs) = cs
 
 instance Pretty CNF where
-  pretty (CNF clauses) = vcat [pretty (disj (map Lit cl)) <> text ";" | cl <- clauses]
+  pretty (CNF clauses) =
+    cat . punctuate semi . map pretty $ clauses
+instance Pretty Clause where
+  pretty (Clause literals) =
+    fillSep . punctuate comma . map pretty $ literals
 
 join1 :: (a -> a -> a) -> a -> [a] -> a
 join1 op unit [] = unit
@@ -21,7 +30,7 @@ join1 op unit [x] = x
 join1 op unit xs = foldr1 op xs
 
 toFormula :: CNF -> Formula
-toFormula (CNF clauses) = conj . map (disj . map Lit) $ clauses
+toFormula (CNF clauses) = conj . map (disj . map Lit . clauseLiterals) $ clauses
 
 conj :: [Formula] -> Formula 
 conj = join1 And (Lit (Literal True (Atom (Predicate "true") [])))
@@ -31,7 +40,7 @@ disj = join1 Or (Lit (Literal False (Atom (Predicate "true") [])))
 -- direct translation, must be negation and quantifier free
 -- must be negation and quantifier free
 clausify :: Formula -> CNF
-clausify (Lit l) = CNF [[l]]
+clausify (Lit l) = CNF [Clause [l]]
 clausify (And f1 f2) =
   let CNF cs1 = clausify f1
       CNF cs2 = clausify f2
@@ -39,7 +48,9 @@ clausify (And f1 f2) =
 clausify (Or f1 f2) =
   let CNF cs1 = clausify f1
       CNF cs2 = clausify f2
-  in CNF [c1++c2 | c1 <- cs1, c2 <- cs2]
+  in CNF [Clause (c1++c2) 
+         | Clause c1 <- cs1,
+           Clause c2 <- cs2]
 
 rename :: Formula -> State (Set.Set Var) Formula
 rename (Lit l) = return $ Lit l

@@ -137,3 +137,16 @@ lpo prec s@(Term f ss) t@(Term g ts) =
 t = Term . Function
 v = VarTerm . Var
 -}
+
+-- annotate term with weight, for faster kbo
+data KBTerm label = KBTerm Int label [KBTerm label]
+weight (KBTerm w _ _) = w
+
+kboConst :: Order a -> Order (KBTerm a)
+kboConst prec (KBTerm w1 f1 ts1) (KBTerm w2 f2 ts2) =
+    compare w1 w2 <> prec f1 f2 <> lexico (kboConst prec) ts1 ts2
+
+label :: (Function -> Int) -> Term -> KBTerm (Either Function Var)
+label funWeight (VarTerm v) = KBTerm 1 (Right v) []
+label funWeight (Term f ts) = KBTerm (funWeight f + sum (map weight ts')) (Left f) ts'
+  where ts' = map (label funWeight) ts

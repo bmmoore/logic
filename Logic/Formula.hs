@@ -1,20 +1,24 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Logic.Formula where
 import qualified Data.Set as Set
 import Data.List(elemIndex)
+import Data.String
 
-newtype Var = Var String
-  deriving (Eq,Ord,Show)
+newtype Var = Var {varName :: String}
+  deriving (Eq,Ord,Show,IsString)
 newtype Function = Function String
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,IsString)
 newtype Predicate = Predicate String
-  deriving (Eq,Ord,Show)
+  deriving (Eq,Ord,Show,IsString)
 
 data Term = Term Function [Term] | VarTerm Var
-  deriving Show
+  deriving (Show,Eq)
 data Atom = Atom Predicate [Term]
-  deriving Show
+  deriving (Show,Eq)
 data Literal = Literal Bool Atom
-  deriving Show
+  deriving (Show,Eq)
+complement :: Literal -> Literal
+complement (Literal s a) = (Literal (not s) a)
 
 data Formula =
     Lit Literal
@@ -110,7 +114,7 @@ nnf :: Formula -> Formula
 nnf = nnf' True
 
 nnf' :: Bool -> Formula -> Formula
-nnf' pos (Lit (Literal sense a)) = Lit (Literal (pos == sense) a)
+nnf' pos (Lit l) = Lit (if pos then l else complement l)
 nnf' pos (Not f) = nnf' (not pos) f
 nnf' True f = cformula (nnf' True) f
 nnf' False (And f1 f2) = Or (nnf' False f1) (nnf' False f2)
