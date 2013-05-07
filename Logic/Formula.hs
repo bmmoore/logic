@@ -3,6 +3,11 @@ module Logic.Formula where
 import qualified Data.Set as Set
 import Data.List(elemIndex)
 import Data.String
+import Control.Applicative
+import Data.Traversable
+import Control.Monad.State
+import Data.Map(Map)
+import qualified Data.Map as Map
 
 newtype Var = Var {varName :: String}
   deriving (Eq,Ord,Show,IsString)
@@ -121,3 +126,31 @@ nnf' False (And f1 f2) = Or (nnf' False f1) (nnf' False f2)
 nnf' False (Or f1 f2) = And (nnf' False f1) (nnf' False f2)
 nnf' False (Forall v f) = Exists v (nnf' False f)
 nnf' False (Exists v f) = Forall v (nnf' False f)
+
+-- Traversal' Var Atom in the language of Control.Lens
+-- used for freshening vars in clauses before unification
+literalVars :: (Applicative m) => (Var -> m Var) -> Literal -> m Literal
+literalVars renameVar (Literal s a) = Literal s <$> atomVars renameVar a
+
+atomVars :: (Applicative m) => (Var -> m Var) -> Atom -> m Atom
+atomVars renameVar (Atom p ts) = Atom p <$> traverse (termVars renameVar) ts
+
+termVars :: (Applicative m) => (Var -> m Var) -> Term -> m Term
+termVars renameVar (VarTerm v) = VarTerm <$> renameVar v
+termVars renameVar (Term f ts) = Term f <$> traverse (termVars renameVar) ts
+
+-- add an integer suffix
+runRenameBase :: ((Var -> State (Int,Map Var Var) Var) ->
+                  (a -> State (Int,Map Var Var) a)) ->
+                 String -> a -> a
+runRenameBase renamer base t =
+    fst $ runState (renamer renameVar t) (0,Map.empty)
+  where renameVar v = do
+          (n,sigma) <- get
+          case Map.lookup v sigma of
+            Just v' -> return v'
+            Nothing -> do
+              let v' = Var (base++show n)
+              put (n+1,Map.insert v v' sigma)
+              return v'          
+                  

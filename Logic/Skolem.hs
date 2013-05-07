@@ -13,6 +13,13 @@ data SkolInfo = SkolInfo Var [Var] Formula
 newtype SkolM a = SkolM {unSkolM :: State (Int,[SkolInfo]) a}
   deriving (Functor,Applicative,Monad)
 
+runSkolM :: SkolM a -> (a,[(Term,Formula)])
+runSkolM m =
+  let (x,(_ndefined,info)) = runState (unSkolM m) (0,[])
+  in (x,[(Term (Function ("sk"++show i)) (map VarTerm args),
+          Exists sv f)
+         | (i,SkolInfo sv args f) <- zip [0..] info])
+
 -- allocSkol v f makes a skolem function for exists v . f,
 -- and returns a term with the function applied to the free variables.
 allocSkol :: Var -> Formula -> SkolM Term

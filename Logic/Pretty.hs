@@ -5,19 +5,21 @@ import Prelude hiding (Left,Right)
 
 import Text.PrettyPrint.Leijen
 
+args as = char '(' <> hcat (punctuate comma as) <> char ')'
+
 instance Pretty Var where
   pretty (Var v) = text v
 instance Pretty Function where  
   pretty (Function f) = text f
 instance Pretty Term where
   pretty (Term f []) = pretty f
-  pretty (Term f ts) = pretty f <> tupled (map pretty ts)
+  pretty (Term f ts) = pretty f <> args (map pretty ts)
   pretty (VarTerm v) = char '?'<>pretty v
 instance Pretty Predicate where  
   pretty (Predicate p) = text p
 instance Pretty Atom where
   pretty (Atom p []) = pretty p
-  pretty (Atom p ts) = pretty p <> tupled (map pretty ts)
+  pretty (Atom p ts) = pretty p <> args (map pretty ts)
 instance Pretty Literal where
   pretty (Literal True a) = pretty a
   pretty (Literal False a) = char '~' <> pretty a
@@ -50,10 +52,11 @@ prettyFormula :: Formula -> (OpInfo, Doc)
 prettyFormula f = case f of
   Lit a -> (maxrator, pretty a)
   Not f -> unary (text"~"<>) notOp f
+--  Not f -> (maxrator, text"~"<>parens (pretty f))
   And l r -> binary "/\\" andOp l r
   Or l r -> binary "\\/" orOp l r
-  Forall v f -> unary (align.((text"forall"<+>pretty v<+>text".")<+>)) quantOp f
-  Exists v f -> unary (align.((text"exists"<+>pretty v<+>text".")<+>)) quantOp f
+  Forall v f -> gatherForall id [v] f
+  Exists v f -> gatherExists id [v] f
  where binary sym o l r =  
          let l' = bracket (prettyFormula l) Left o
              r' = bracket (prettyFormula r) Right o
@@ -61,6 +64,20 @@ prettyFormula f = case f of
        unary wrap o f =
          let f' = bracket (prettyFormula f) Nonassoc o
          in (o, wrap f')
+       mkForall vs = text"forall"<+>hsep(map pretty vs)<+>text "."     
+       mkExists vs = text"exists"<+>hsep(map pretty vs)<+>text "."     
+       gatherForall doc vs (Forall v f) =
+         gatherForall doc (v:vs) f
+       gatherForall doc vs (Exists v f) =
+         gatherExists (doc.(mkForall (reverse vs)<+>)) [v] f
+       gatherForall doc vs f =
+         unary (nest 2 . doc . (mkForall (reverse vs)<+>)) quantOp f
+       gatherExists doc vs (Exists v f) =
+         gatherExists doc (v:vs) f
+       gatherExists doc vs (Forall v f) =
+         gatherForall (doc.(mkExists (reverse vs)<+>)) [v] f
+       gatherExists doc vs f =
+         unary (nest 2 . doc .  (mkExists (reverse vs)<+>)) quantOp f
        [quantOp,orOp,andOp,notOp,maxrator] =
          zip [0..] [Prefix,Infix Right,Infix Right,Prefix,Infix Nonassoc]
 

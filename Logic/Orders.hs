@@ -5,6 +5,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Function(on)
 import Debug.Trace
+import Text.PrettyPrint.Leijen(Pretty(pretty),char)
 
 import Logic.Formula
 
@@ -14,6 +15,12 @@ varOccs (Term f ts) = Map.unionsWith (+) (map varOccs ts)
 
 data MbOrdering = Unordered | Ordered Ordering
   deriving (Show,Eq,Ord)
+
+instance Pretty MbOrdering where
+  pretty (Ordered LT) = char '<'
+  pretty (Ordered EQ) = char '='
+  pretty (Ordered GT) = char '>'
+  pretty Unordered = char '?'  
 
 instance Monoid MbOrdering where
   mempty = Ordered EQ
@@ -138,6 +145,16 @@ t = Term . Function
 v = VarTerm . Var
 -}
 
+multiGe :: (Eq a) => MbOrder a -> (Multiset a -> Multiset a -> Bool)
+multiGe termOrd m1 m2 = all (\(t1,k1) ->
+  (case lookup t1 m2 of
+      Just k2 -> k1 >= k2 ||
+        any (\(t',k') -> termOrd t' t1 == Ordered GT
+                      && case lookup t' m2 of
+                           Just k2' -> k' > k2'
+                           Nothing -> True) m1
+      Nothing -> True)) m1
+
 -- annotate term with weight, for faster kbo
 data KBTerm label = KBTerm Int label [KBTerm label]
 weight (KBTerm w _ _) = w
@@ -150,3 +167,12 @@ label :: (Function -> Int) -> Term -> KBTerm (Either Function Var)
 label funWeight (VarTerm v) = KBTerm 1 (Right v) []
 label funWeight (Term f ts) = KBTerm (funWeight f + sum (map weight ts')) (Left f) ts'
   where ts' = map (label funWeight) ts
+
+lexAtomOrder :: Order Predicate -> MbOrder Term -> MbOrder Atom
+lexAtomOrder predOrder termOrder (Atom p1 ts1) (Atom p2 ts2)=
+  Ordered (predOrder p1 p2) <> lexico termOrder ts1 ts2
+
+negGreatestLitOrder :: MbOrder Atom -> MbOrder Literal
+negGreatestLitOrder atomOrder (Literal b1 a1) (Literal b2 a2) =
+  -- False < True in the usual order
+  Ordered (compare b2 b1) <> atomOrder a1 a2

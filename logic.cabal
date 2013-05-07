@@ -9,8 +9,12 @@ maintainer:          bmmoore@illinois.edu
 category:            Math
 build-type:          Simple
 cabal-version:       >=1.8
+executable MaudeExample
+  ghc-options: -O2
+  main-is: MaudeExample.hs
+  build-depends:       base ==4.*, parsec >=3.0, wl-pprint >=1.0, mtl >= 2.0, containers
 library
-  exposed-modules:     Logic, Logic.Formula, Logic.Parse, Logic.Pretty,
+  exposed-modules:     Logic, Logic.Formula, Logic.Parse, Logic.ExampleParser, Logic.Pretty,
                        Logic.CNF, Logic.Skolem, Logic.Orders, Logic.Unification,
                        Logic.Resolution
   build-depends:       base ==4.*, parsec >=3.0, wl-pprint >=1.0, mtl >= 2.0, containers

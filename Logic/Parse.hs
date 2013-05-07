@@ -23,9 +23,6 @@ import Control.Applicative
 
 type Parser = Parsec String ()
 
--- apply a list of prefix operators, to work around parsec parsing only one
-prefix p = Prefix (chainl1 p (return (.)))
-
 parseWhole :: Parser a -> String -> Either String a
 parseWhole p input = case parse (whiteSpace *> p <* eof) "" input of
   Left err -> Left (show err)
@@ -37,18 +34,24 @@ parseFormula = parseWhole formula
 parseTerm :: String -> Either String Term
 parseTerm = parseWhole term
 
+-- apply a list of prefix operators, to work around parsec parsing only one
+prefix p = Prefix (chainl1 p (return (.)))
+
 formula :: Parser Formula
 formula = buildExpressionParser [[prefix (Not <$ symbol "~")],
                                  [Infix (And <$ symbol "/\\") AssocRight],
-                                 [Infix (Or <$ symbol "\\/") AssocRight]
-                                 ]
-          (chainl (do quantifier <- (Forall <$ reserved "forall"
-                                 <|> Exists <$ reserved "exists")
-                      vars <- many1 (Var <$> identifier)
-                      symbol "."
-                      return (\f -> foldr quantifier f vars))
-            (return (.)) id
-           <*> (parens formula <|> Lit . Literal True <$> atom))
+                                 [Infix (Or <$ symbol "\\/") AssocRight]]
+          (parens formula
+           <|> chainl1 quantifier (return (.)) <*> formula
+           <|> Lit . Literal True <$> atom
+           <|> Lit . Literal False <$> (symbol "~" *> atom))
+  where          
+    quantifier = do quantifier <- (Forall <$ reserved "forall"
+                                   <|> Exists <$ reserved "exists")
+                    vars <- many1 (Var <$> identifier)
+                    symbol "."
+                    return (\f -> foldr quantifier f vars)
+          
 
 clauses :: Parser CNF
 clauses = CNF <$> semiSep clause
@@ -67,7 +70,9 @@ term = Term <$> (Function <$> identifier) <*> option [] (parens (commaSep term))
    <|> VarTerm <$> (char '?' >> Var <$> identifier)
    <?> "term"
 
-tokenParser = P.makeTokenParser (emptyDef {P.reservedNames = ["forall","exists"]})
+tokenParser = P.makeTokenParser
+  (emptyDef {P.reservedNames = ["forall","exists"]
+            ,P.identLetter = alphaNum <|> oneOf "-_"})
 
 parens = P.parens tokenParser
 symbol = P.symbol tokenParser

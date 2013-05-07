@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Logic.CNF where
 import Control.Applicative
+import Data.Traversable
 import Control.Monad.State
 import Data.Char
 import qualified Data.Set as Set
@@ -11,18 +12,19 @@ import Text.PrettyPrint.Leijen
   hiding ((<$>))
 
 newtype Clause = Clause [Literal]
-  deriving Show
+  deriving (Show,Eq)
 clauseLiterals (Clause ls) = ls
 newtype CNF = CNF [Clause] -- conjuction of disjunctions
   deriving Show
 cnfClauses (CNF cs) = cs
 
+clauseVars :: (Applicative f) => (Var -> f Var) -> (Clause -> f Clause)
+clauseVars renameVar (Clause ls) = Clause <$> traverse (literalVars renameVar) ls
+
 instance Pretty CNF where
-  pretty (CNF clauses) =
-    cat . punctuate semi . map pretty $ clauses
+  pretty (CNF clauses) = semiBraces (map pretty clauses)
 instance Pretty Clause where
-  pretty (Clause literals) =
-    fillSep . punctuate comma . map pretty $ literals
+  pretty (Clause literals) = tupled (map pretty literals)
 
 join1 :: (a -> a -> a) -> a -> [a] -> a
 join1 op unit [] = unit
@@ -75,6 +77,12 @@ data DefPredInfo = DefPred [Var] Formula
   deriving Show
 newtype StructM a = StructM {unStructM :: State (Int,[DefPredInfo]) a}
   deriving (Functor,Applicative,Monad)
+
+runStructM :: StructM a -> (a,[(Atom,Formula)])
+runStructM m =
+  let (x,(_ndefined,infos)) = runState (unStructM m) (0,[])
+  in (x,[(Atom (Predicate ("pdef"++show i)) (map VarTerm vs), f)
+        |(i,DefPred vs f) <- zip [0..] infos])
 
 -- should share
 getDefPred :: Formula -> StructM (Predicate,[Var])
